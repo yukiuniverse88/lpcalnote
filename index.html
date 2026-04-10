@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Secret Log</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiU2VjcmV0IExvZyIsInNob3J0X25hbWUiOiJTZWNyZXQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBhMGExMiIsInRoZW1lX2NvbG9yIjoiIzBhMGExMiJ9">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400&display=swap');
+
+:root {
+  --bg: #0a0a12;
+  --bg2: #12121e;
+  --bg3: #1a1a2e;
+  --surface: #16162a;
+  --border: #2a2a44;
+  --text: #e0dff0;
+  --text2: #8888aa;
+  --accent: #6c5ce7;
+  --accent2: #a29bfe;
+  --danger: #e74c6c;
+  --star: #feca57;
+  --tag-claude: #e8a87c;
+  --tag-chatgpt: #74d7a0;
+  --tag-other: #74b9ff;
+  --radius: 14px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ===== LOCK SCREEN ===== */
+#lockScreen {
+  position: fixed; inset:0; z-index:1000;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 30px;
+  transition: opacity .4s, transform .4s;
+}
+#lockScreen.hide { opacity:0; transform:scale(1.05); pointer-events:none; }
+#lockScreen .lock-icon { font-size: 48px; opacity:.6; }
+#lockScreen h2 { font-weight:300; font-size:18px; color:var(--text2); letter-spacing:2px; }
+.pin-dots { display:flex; gap:14px; }
+.pin-dot {
+  width:14px; height:14px; border-radius:50%;
+  border: 2px solid var(--accent2);
+  transition: background .15s, transform .15s;
+}
+.pin-dot.filled { background:var(--accent2); transform:scale(1.2); }
+.pin-dot.error { border-color:var(--danger); background:var(--danger); }
+.numpad { display:grid; grid-template-columns:repeat(3,70px); gap:12px; margin-top:10px; }
+.numpad button {
+  width:70px; height:70px; border-radius:50%;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 24px; font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+.numpad button:active { background:var(--accent); transform:scale(.92); }
+.numpad .del-btn { font-size:14px; letter-spacing:1px; }
+
+/* ===== MAIN APP ===== */
+#app { display:none; }
+#app.show { display:block; }
+
+/* Header */
+.header {
+  position: sticky; top:0; z-index:100;
+  background: rgba(10,10,18,.85);
+  backdrop-filter: blur(20px);
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.header-top { display:flex; justify-content:space-between; align-items:center; }
+.header h1 {
+  font-size:20px; font-weight:500;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  letter-spacing: 1px;
+}
+.header-actions { display:flex; gap:12px; }
+.header-actions button {
+  background:none; border:none; color:var(--text2);
+  font-size:20px; cursor:pointer; padding:4px;
+}
+.header-actions button:active { color:var(--accent2); }
+
+/* Search bar */
+.search-bar {
+  margin-top:10px;
+  display: none;
+  position:relative;
+}
+.search-bar.show { display:block; }
+.search-bar input {
+  width:100%; padding:10px 14px 10px 36px;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px; color:var(--text);
+  font-size:15px; font-family:'Noto Sans JP',sans-serif;
+  outline:none;
+}
+.search-bar input:focus { border-color:var(--accent); }
+.search-bar::before {
+  content:'🔍'; position:absolute; left:10px; top:50%;
+  transform:translateY(-50%); font-size:14px;
+}
+
+/* Filter tabs */
+.filter-tabs {
+  display:flex; gap:8px; padding:12px 20px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.filter-tabs::-webkit-scrollbar { display:none; }
+.filter-tab {
+  padding:6px 14px; border-radius:20px;
+  background:var(--bg2); border:1px solid var(--border);
+  color:var(--text2); font-size:13px;
+  white-space:nowrap; cursor:pointer;
+  transition: all .2s;
+}
+.filter-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* Log list */
+.log-list { padding: 8px 16px 100px; }
+.log-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: transform .15s, border-color .2s;
+  position: relative;
+}
+.log-card:active { transform:scale(.98); }
+.log-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.log-title { font-size:15px; font-weight:500; flex:1; margin-right:8px; }
+.log-star { background:none; border:none; font-size:18px; cursor:pointer; padding:2px; }
+.log-meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.log-date { font-size:12px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
+.log-tag {
+  font-size:11px; padding:2px 8px; border-radius:10px;
+  font-weight:500;
+}
+.log-tag.claude { background:rgba(232,168,124,.15); color:var(--tag-claude); }
+.log-tag.chatgpt { background:rgba(116,215,160,.15); color:var(--tag-chatgpt); }
+.log-tag.other { background:rgba(116,185,255,.15); color:var(--tag-other); }
+.log-preview {
+  font-size:13px; color:var(--text2);
+  margin-top:8px;
+  display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+  line-height:1.6;
+}
+
+/* Empty state */
+.empty-state {
+  text-align:center; padding:80px 20px; color:var(--text2);
+}
+.empty-state .icon { font-size:48px; margin-bottom:16px; opacity:.5; }
+.empty-state p { font-size:14px; line-height:1.8; }
+
+/* FAB */
+.fab {
+  position:fixed; bottom:28px; right:20px;
+  width:58px; height:58px; border-radius:50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border:none; color:#fff; font-size:28px;
+  cursor:pointer; z-index:50;
+  box-shadow: 0 4px 20px rgba(108,92,231,.4);
+  transition: transform .15s;
+}
+.fab:active { transform:scale(.9); }
+
+/* ===== MODAL (Add/Edit/View) ===== */
+.modal-overlay {
+  position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(4px);
+  display:none; align-items:flex-end; justify-content:center;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background:var(--bg2);
+  border-radius:20px 20px 0 0;
+  width:100%; max-width:500px;
+  max-height:92dvh;
+  overflow-y:auto;
+  padding:20px 20px 32px;
+  animation: slideUp .3s ease-out;
+}
+@keyframes slideUp { from { transform:translateY(100%); } }
+.modal-handle {
+  width:40px; height:4px; background:var(--border);
+  border-radius:2px; margin:0 auto 16px;
+}
+.modal h2 { font-size:18px; font-weight:500; margin-bottom:16px; }
+
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; color:var(--text2); margin-bottom:6px; }
+.form-group input, .form-group textarea, .form-group select {
+  width:100%; padding:11px 14px;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:10px; color:var(--text);
+  font-size:15px; font-family:'Noto Sans JP',sans-serif;
+  outline:none; resize:vertical;
+}
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+  border-color:var(--accent);
+}
+.form-group textarea { min-height:200px; line-height:1.7; }
+.form-group select { appearance:none; }
+
+.form-actions { display:flex; gap:10px; margin-top:18px; }
+.btn {
+  flex:1; padding:13px; border-radius:12px;
+  border:none; font-size:15px; font-weight:500;
+  font-family:'Noto Sans JP',sans-serif;
+  cursor:pointer; transition: opacity .15s;
+}
+.btn:active { opacity:.8; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-cancel { background:var(--bg3); color:var(--text2); }
+.btn-danger { background:var(--danger); color:#fff; }
+
+/* View mode */
+.view-content {
+  white-space:pre-wrap; word-break:break-word;
+  font-size:14px; line-height:1.8;
+  color:var(--text);
+  max-height:60dvh; overflow-y:auto;
+  background:var(--bg);
+  border-radius:10px; padding:16px;
+  margin-bottom:14px;
+  font-family:'Noto Sans JP',sans-serif;
+}
+.view-actions { display:flex; gap:8px; }
+
+/* Settings modal */
+.setting-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 0; border-bottom:1px solid var(--border);
+}
+.setting-row:last-child { border:none; }
+.setting-label { font-size:14px; }
+.setting-desc { font-size:12px; color:var(--text2); margin-top:2px; }
+.pin-input-row { display:flex; gap:8px; margin-top:8px; }
+.pin-input-row input {
+  width:45px; height:45px; text-align:center;
+  font-size:20px; font-family:'JetBrains Mono',monospace;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:10px; color:var(--text); outline:none;
+  -webkit-text-security: disc;
+}
+
+/* toast */
+.toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+  background:var(--bg3); color:var(--text);
+  padding:10px 20px; border-radius:20px;
+  font-size:13px; z-index:999;
+  opacity:0; transition:opacity .3s;
+  pointer-events:none;
+}
+.toast.show { opacity:1; }
+
+/* Append hint */
+.append-hint {
+  background: rgba(108,92,231,.1);
+  border: 1px dashed var(--accent);
+  border-radius:10px;
+  padding:10px 14px;
+  font-size:12px;
+  color:var(--accent2);
+  margin-bottom:10px;
+  text-align:center;
+  line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<!-- Lock Screen -->
+<div id="lockScreen">
+  <div class="lock-icon">🔒</div>
+  <h2>Secret Log</h2>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot"></div><div class="pin-dot"></div>
+    <div class="pin-dot"></div><div class="pin-dot"></div>
+  </div>
+  <div class="numpad" id="numpad">
+    <button onclick="pinInput('1')">1</button>
+    <button onclick="pinInput('2')">2</button>
+    <button onclick="pinInput('3')">3</button>
+    <button onclick="pinInput('4')">4</button>
+    <button onclick="pinInput('5')">5</button>
+    <button onclick="pinInput('6')">6</button>
+    <button onclick="pinInput('7')">7</button>
+    <button onclick="pinInput('8')">8</button>
+    <button onclick="pinInput('9')">9</button>
+    <button disabled></button>
+    <button onclick="pinInput('0')">0</button>
+    <button class="del-btn" onclick="pinDelete()">DEL</button>
+  </div>
+  <p id="lockMsg" style="font-size:12px;color:var(--text2);margin-top:8px;min-height:18px;"></p>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <div class="header">
+    <div class="header-top">
+      <h1>🔐 Secret Log</h1>
+      <div class="header-actions">
+        <button onclick="toggleSearch()" title="検索">🔍</button>
+        <button onclick="openSettings()" title="設定">⚙️</button>
+      </div>
+    </div>
+    <div class="search-bar" id="searchBar">
+      <input type="text" id="searchInput" placeholder="ログを検索..." oninput="renderList()">
+    </div>
+  </div>
+
+  <div class="filter-tabs" id="filterTabs">
+    <div class="filter-tab active" data-filter="all" onclick="setFilter('all')">すべて</div>
+    <div class="filter-tab" data-filter="star" onclick="setFilter('star')">⭐ お気に入り</div>
+    <div class="filter-tab" data-filter="claude" onclick="setFilter('claude')">Claude</div>
+    <div class="filter-tab" data-filter="chatgpt" onclick="setFilter('chatgpt')">ChatGPT</div>
+    <div class="filter-tab" data-filter="other" onclick="setFilter('other')">その他</div>
+  </div>
+
+  <div class="log-list" id="logList"></div>
+  <button class="fab" onclick="openAdd()">＋</button>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="editTitle">新しいログ</h2>
+    <div class="append-hint">📋 ペーストするたびに追記されます。何回でも貼り付けOK！</div>
+    <div class="form-group">
+      <label>タイトル</label>
+      <input type="text" id="fTitle" placeholder="会話のタイトル">
+    </div>
+    <div class="form-group">
+      <label>AI</label>
+      <select id="fTag">
+        <option value="claude">Claude</option>
+        <option value="chatgpt">ChatGPT</option>
+        <option value="other">その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ログ内容</label>
+      <textarea id="fContent" placeholder="ここに会話をペースト..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-cancel" onclick="closeModal('editModal')">キャンセル</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveLog()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Modal -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 id="viewTitle" style="margin:0;flex:1;"></h2>
+      <span id="viewTag" class="log-tag" style="margin-left:8px;"></span>
+    </div>
+    <div id="viewDate" style="font-size:12px;color:var(--text2);margin-bottom:12px;font-family:'JetBrains Mono',monospace;"></div>
+    <div class="view-content" id="viewContent"></div>
+    <div class="view-actions">
+      <button class="btn btn-cancel" onclick="closeModal('viewModal')">閉じる</button>
+      <button class="btn btn-primary" onclick="editCurrent()">✏️ 編集</button>
+      <button class="btn btn-danger" onclick="deleteCurrent()">🗑</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>設定</h2>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">PINコード変更</div>
+        <div class="setting-desc">4桁の数字</div>
+      </div>
+    </div>
+    <div class="pin-input-row" id="newPinRow">
+      <input type="tel" maxlength="1" oninput="pinFieldNext(this,0)">
+      <input type="tel" maxlength="1" oninput="pinFieldNext(this,1)">
+      <input type="tel" maxlength="1" oninput="pinFieldNext(this,2)">
+      <input type="tel" maxlength="1" oninput="pinFieldNext(this,3)">
+      <button class="btn btn-primary" style="flex:none;padding:10px 16px;" onclick="changePin()">変更</button>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">データエクスポート</div>
+        <div class="setting-desc">JSONファイルで書き出し</div>
+      </div>
+      <button class="btn btn-primary" style="flex:none;padding:8px 16px;font-size:13px;" onclick="exportData()">出力</button>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">データインポート</div>
+        <div class="setting-desc">JSONファイルから復元</div>
+      </div>
+      <button class="btn btn-primary" style="flex:none;padding:8px 16px;font-size:13px;" onclick="importData()">読込</button>
+    </div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-cancel" style="width:100%;" onclick="closeModal('settingsModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+
+<script>
+// ===== DATA =====
+const DB_KEY = 'secretlog_data';
+const PIN_KEY = 'secretlog_pin';
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || []; }
+  catch { return []; }
+}
+function setData(d) { localStorage.setItem(DB_KEY, JSON.stringify(d)); }
+function getPin() { return localStorage.getItem(PIN_KEY) || '0000'; }
+function setPin(p) { localStorage.setItem(PIN_KEY, p); }
+
+// ===== LOCK =====
+let pinBuffer = '';
+let isFirstTime = !localStorage.getItem(PIN_KEY);
+
+if (isFirstTime) {
+  document.getElementById('lockMsg').textContent = '初回PINを設定してください（4桁）';
+}
+
+function pinInput(n) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += n;
+  updateDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(() => {
+      if (isFirstTime) {
+        setPin(pinBuffer);
+        isFirstTime = false;
+        unlock();
+        toast('PINを設定しました');
+      } else if (pinBuffer === getPin()) {
+        unlock();
+      } else {
+        const dots = document.querySelectorAll('.pin-dot');
+        dots.forEach(d => d.classList.add('error'));
+        document.getElementById('lockMsg').textContent = 'PINが違います';
+        setTimeout(() => {
+          pinBuffer = '';
+          updateDots();
+          dots.forEach(d => d.classList.remove('error'));
+          document.getElementById('lockMsg').textContent = '';
+        }, 600);
+      }
+    }, 150);
+  }
+}
+
+function pinDelete() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updateDots();
+}
+
+function updateDots() {
+  document.querySelectorAll('.pin-dot').forEach((d, i) => {
+    d.classList.toggle('filled', i < pinBuffer.length);
+  });
+}
+
+function unlock() {
+  document.getElementById('lockScreen').classList.add('hide');
+  document.getElementById('app').classList.add('show');
+  renderList();
+}
+
+// ===== FILTER & SEARCH =====
+let currentFilter = 'all';
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.filter === f);
+  });
+  renderList();
+}
+
+function toggleSearch() {
+  const bar = document.getElementById('searchBar');
+  bar.classList.toggle('show');
+  if (bar.classList.contains('show')) {
+    document.getElementById('searchInput').focus();
+  } else {
+    document.getElementById('searchInput').value = '';
+    renderList();
+  }
+}
+
+// ===== RENDER =====
+function renderList() {
+  const list = document.getElementById('logList');
+  let logs = getData();
+  const q = document.getElementById('searchInput').value.toLowerCase();
+
+  if (currentFilter === 'star') logs = logs.filter(l => l.star);
+  else if (currentFilter !== 'all') logs = logs.filter(l => l.tag === currentFilter);
+
+  if (q) logs = logs.filter(l =>
+    l.title.toLowerCase().includes(q) || l.content.toLowerCase().includes(q)
+  );
+
+  logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (!logs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📝</div><p>ログがありません<br>＋ボタンで追加しよう</p></div>`;
+    return;
+  }
+
+  list.innerHTML = logs.map(l => `
+    <div class="log-card" onclick="viewLog('${l.id}')">
+      <div class="log-card-header">
+        <div class="log-title">${esc(l.title)}</div>
+        <button class="log-star" onclick="event.stopPropagation();toggleStar('${l.id}')">${l.star ? '⭐' : '☆'}</button>
+      </div>
+      <div class="log-meta">
+        <span class="log-date">${formatDate(l.date)}</span>
+        <span class="log-tag ${l.tag}">${tagLabel(l.tag)}</span>
+      </div>
+      <div class="log-preview">${esc(l.content)}</div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function tagLabel(t) { return {claude:'Claude',chatgpt:'ChatGPT',other:'その他'}[t]||t; }
+function formatDate(d) { const dt=new Date(d); return dt.toLocaleDateString('ja-JP')+'  '+dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
+
+// ===== STAR =====
+function toggleStar(id) {
+  const d = getData();
+  const i = d.findIndex(l => l.id===id);
+  if (i>=0) { d[i].star = !d[i].star; setData(d); renderList(); }
+}
+
+// ===== ADD / EDIT =====
+let editId = null;
+let appendMode = false;
+
+function openAdd() {
+  editId = null;
+  appendMode = true;
+  document.getElementById('editTitle').textContent = '新しいログ';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fTag').value = 'claude';
+  document.getElementById('fContent').value = '';
+  document.getElementById('saveBtn').textContent = '保存';
+  openModal('editModal');
+  setupAppendMode();
+}
+
+function setupAppendMode() {
+  const ta = document.getElementById('fContent');
+  ta.addEventListener('paste', handlePaste);
+}
+
+function handlePaste(e) {
+  const ta = document.getElementById('fContent');
+  if (!appendMode || !ta.value.trim()) return; // first paste = normal
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  const separator = '\n\n── ── ── ── ──\n\n';
+  ta.value += separator + text;
+  ta.scrollTop = ta.scrollHeight;
+  toast('追記しました');
+}
+
+function editCurrent() {
+  const d = getData();
+  const l = d.find(x => x.id === viewingId);
+  if (!l) return;
+  closeModal('viewModal');
+  editId = l.id;
+  appendMode = true;
+  document.getElementById('editTitle').textContent = 'ログを編集';
+  document.getElementById('fTitle').value = l.title;
+  document.getElementById('fTag').value = l.tag;
+  document.getElementById('fContent').value = l.content;
+  document.getElementById('saveBtn').textContent = '更新';
+  setTimeout(() => { openModal('editModal'); setupAppendMode(); }, 300);
+}
+
+function saveLog() {
+  const title = document.getElementById('fTitle').value.trim();
+  const tag = document.getElementById('fTag').value;
+  const content = document.getElementById('fContent').value.trim();
+  if (!title || !content) { toast('タイトルと内容を入力してね'); return; }
+
+  const d = getData();
+  if (editId) {
+    const i = d.findIndex(l => l.id===editId);
+    if (i>=0) { d[i].title=title; d[i].tag=tag; d[i].content=content; d[i].updated=new Date().toISOString(); }
+  } else {
+    d.push({ id: crypto.randomUUID(), title, tag, content, date: new Date().toISOString(), star: false });
+  }
+  setData(d);
+  closeModal('editModal');
+  renderList();
+  toast(editId ? '更新しました' : '保存しました');
+  editId = null;
+}
+
+// ===== VIEW =====
+let viewingId = null;
+
+function viewLog(id) {
+  const d = getData();
+  const l = d.find(x => x.id===id);
+  if (!l) return;
+  viewingId = id;
+  document.getElementById('viewTitle').textContent = l.title;
+  document.getElementById('viewTag').textContent = tagLabel(l.tag);
+  document.getElementById('viewTag').className = 'log-tag ' + l.tag;
+  document.getElementById('viewDate').textContent = formatDate(l.date);
+  document.getElementById('viewContent').textContent = l.content;
+  openModal('viewModal');
+}
+
+function deleteCurrent() {
+  if (!confirm('このログを削除しますか？')) return;
+  let d = getData();
+  d = d.filter(l => l.id !== viewingId);
+  setData(d);
+  closeModal('viewModal');
+  renderList();
+  toast('削除しました');
+}
+
+// ===== SETTINGS =====
+function openSettings() { openModal('settingsModal'); }
+
+function pinFieldNext(el, idx) {
+  if (el.value && idx < 3) {
+    document.querySelectorAll('#newPinRow input')[idx+1].focus();
+  }
+}
+
+function changePin() {
+  const inputs = document.querySelectorAll('#newPinRow input');
+  const p = Array.from(inputs).map(i => i.value).join('');
+  if (p.length !== 4 || !/^\d{4}$/.test(p)) { toast('4桁の数字を入力してね'); return; }
+  setPin(p);
+  inputs.forEach(i => i.value='');
+  toast('PINを変更しました');
+}
+
+function exportData() {
+  const d = getData();
+  const blob = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'secret-log-backup.json';
+  a.click();
+  toast('エクスポートしました');
+}
+
+function importData() { document.getElementById('importFile').click(); }
+
+function handleImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!Array.isArray(imported)) throw 'bad';
+      const current = getData();
+      const ids = new Set(current.map(l => l.id));
+      let added = 0;
+      imported.forEach(l => { if (!ids.has(l.id)) { current.push(l); added++; } });
+      setData(current);
+      renderList();
+      toast(`${added}件インポートしました`);
+    } catch { toast('ファイルを読み込めませんでした'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ===== MODAL UTILS =====
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+  appendMode = false;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
+});
+</script>
+</body>
+</html>
