@@ -6,366 +6,196 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Secret Log</title>
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiU2VjcmV0IExvZyIsInNob3J0X25hbWUiOiJTZWNyZXQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBhMGExMiIsInRoZW1lX2NvbG9yIjoiIzBhMGExMiJ9">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400&display=swap');
-
 :root {
-  --bg: #0a0a12;
-  --bg2: #12121e;
-  --bg3: #1a1a2e;
-  --surface: #16162a;
-  --border: #2a2a44;
-  --text: #e0dff0;
-  --text2: #8888aa;
-  --accent: #6c5ce7;
-  --accent2: #a29bfe;
-  --danger: #e74c6c;
-  --star: #feca57;
-  --tag-claude: #e8a87c;
-  --tag-chatgpt: #74d7a0;
-  --tag-other: #74b9ff;
-  --radius: 14px;
+  --bg:#0a0a12;--bg2:#12121e;--bg3:#1a1a2e;--surface:#16162a;
+  --border:#2a2a44;--text:#e0dff0;--text2:#8888aa;--text3:#555577;
+  --accent:#6c5ce7;--accent2:#a29bfe;--danger:#e74c6c;--star:#feca57;
+  --radius:14px;
 }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;-webkit-font-smoothing:antialiased}
+.screen{display:none;height:100dvh;flex-direction:column;position:relative;overflow:hidden}
+.screen.active{display:flex}
 
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+/* PATTERN LOCK */
+#sLock{align-items:center;justify-content:center;background:#08080f}
+#sLock h2{font-weight:300;font-size:16px;color:var(--text2);letter-spacing:3px;margin-bottom:30px}
+#sLock .lock-sub{font-size:12px;color:var(--text3);margin-top:20px;min-height:18px;text-align:center}
+.pattern-grid{display:grid;grid-template-columns:repeat(3,60px);gap:36px;touch-action:none;position:relative}
+.pattern-dot-wrap{width:60px;height:60px;display:flex;align-items:center;justify-content:center}
+.pattern-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--text3);background:transparent;transition:all .15s;pointer-events:none}
+.pattern-dot.active{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 12px rgba(162,155,254,.5)}
+.pattern-dot.error{background:var(--danger);border-color:var(--danger);box-shadow:0 0 12px rgba(231,76,108,.5)}
+.pattern-canvas{position:absolute;inset:0;pointer-events:none}
 
-body {
-  font-family: 'Noto Sans JP', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100dvh;
-  overflow-x: hidden;
-}
+/* HEADER */
+.header{position:sticky;top:0;z-index:100;background:rgba(10,10,18,.88);backdrop-filter:blur(20px);padding:14px 18px 10px;border-bottom:1px solid var(--border)}
+.header-top{display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:18px;font-weight:500;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px}
+.header-actions{display:flex;gap:10px}
+.header-actions button{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px}
+.search-bar{margin-top:8px;display:none;position:relative}
+.search-bar.show{display:block}
+.search-bar input{width:100%;padding:9px 12px 9px 34px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none}
+.search-bar input:focus{border-color:var(--accent)}
+.search-bar::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px}
 
-/* ===== LOCK SCREEN ===== */
-#lockScreen {
-  position: fixed; inset:0; z-index:1000;
-  background: var(--bg);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 30px;
-  transition: opacity .4s, transform .4s;
-}
-#lockScreen.hide { opacity:0; transform:scale(1.05); pointer-events:none; }
-#lockScreen .lock-icon { font-size: 48px; opacity:.6; }
-#lockScreen h2 { font-weight:300; font-size:18px; color:var(--text2); letter-spacing:2px; }
-.pin-dots { display:flex; gap:14px; }
-.pin-dot {
-  width:14px; height:14px; border-radius:50%;
-  border: 2px solid var(--accent2);
-  transition: background .15s, transform .15s;
-}
-.pin-dot.filled { background:var(--accent2); transform:scale(1.2); }
-.pin-dot.error { border-color:var(--danger); background:var(--danger); }
-.numpad { display:grid; grid-template-columns:repeat(3,70px); gap:12px; margin-top:10px; }
-.numpad button {
-  width:70px; height:70px; border-radius:50%;
-  border: 1px solid var(--border);
-  background: var(--bg2);
-  color: var(--text);
-  font-size: 24px; font-family: 'JetBrains Mono', monospace;
-  cursor: pointer;
-  transition: background .15s, transform .1s;
-}
-.numpad button:active { background:var(--accent); transform:scale(.92); }
-.numpad .del-btn { font-size:14px; letter-spacing:1px; }
+/* NAV */
+.nav-tabs{display:flex;border-bottom:1px solid var(--border)}
+.nav-tab{flex:1;padding:10px;text-align:center;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.nav-tab.active{color:var(--accent2);border-bottom-color:var(--accent2)}
 
-/* ===== MAIN APP ===== */
-#app { display:none; }
-#app.show { display:block; }
+/* CHIPS */
+.filter-chips{display:flex;gap:6px;padding:10px 18px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.filter-chips::-webkit-scrollbar{display:none}
+.chip{padding:5px 12px;border-radius:18px;background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-size:12px;white-space:nowrap;cursor:pointer;transition:all .2s;flex-shrink:0}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
-/* Header */
-.header {
-  position: sticky; top:0; z-index:100;
-  background: rgba(10,10,18,.85);
-  backdrop-filter: blur(20px);
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.header-top { display:flex; justify-content:space-between; align-items:center; }
-.header h1 {
-  font-size:20px; font-weight:500;
-  background: linear-gradient(135deg, var(--accent2), var(--accent));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  letter-spacing: 1px;
-}
-.header-actions { display:flex; gap:12px; }
-.header-actions button {
-  background:none; border:none; color:var(--text2);
-  font-size:20px; cursor:pointer; padding:4px;
-}
-.header-actions button:active { color:var(--accent2); }
+/* LOG CARDS */
+.log-list{flex:1;overflow-y:auto;padding:8px 14px 100px}
+.log-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:8px;cursor:pointer;transition:transform .1s}
+.log-card:active{transform:scale(.98)}
+.log-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.log-title{font-size:14px;font-weight:500;flex:1;margin-right:8px}
+.log-star{background:none;border:none;font-size:16px;cursor:pointer;padding:2px}
+.log-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.log-date{font-size:11px;color:var(--text3);font-family:monospace}
+.tag{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500}
+.tag-claude{background:rgba(232,168,124,.15);color:#e8a87c}
+.tag-chatgpt{background:rgba(116,215,160,.15);color:#74d7a0}
+.tag-grok{background:rgba(255,165,89,.15);color:#ffa559}
+.tag-api{background:rgba(116,185,255,.15);color:#74b9ff}
+.tag-other{background:rgba(180,180,200,.15);color:#b4b4c8}
+.log-preview{font-size:12px;color:var(--text2);margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.6}
+.log-chara-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.chara-mini-tag{font-size:10px;padding:1px 6px;border-radius:6px;border:1px solid;opacity:.8}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty-state .icon{font-size:40px;margin-bottom:12px;opacity:.5}
+.empty-state p{font-size:13px;line-height:1.8}
+.fab{position:fixed;bottom:26px;right:18px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-size:26px;cursor:pointer;z-index:50;box-shadow:0 4px 20px rgba(108,92,231,.4);transition:transform .15s}
+.fab:active{transform:scale(.88)}
 
-/* Search bar */
-.search-bar {
-  margin-top:10px;
-  display: none;
-  position:relative;
-}
-.search-bar.show { display:block; }
-.search-bar input {
-  width:100%; padding:10px 14px 10px 36px;
-  background:var(--bg2); border:1px solid var(--border);
-  border-radius:10px; color:var(--text);
-  font-size:15px; font-family:'Noto Sans JP',sans-serif;
-  outline:none;
-}
-.search-bar input:focus { border-color:var(--accent); }
-.search-bar::before {
-  content:'🔍'; position:absolute; left:10px; top:50%;
-  transform:translateY(-50%); font-size:14px;
-}
+/* CHARA GRID */
+.chara-grid{flex:1;overflow-y:auto;padding:10px 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+.chara-cell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;background:var(--bg2);border-radius:12px;cursor:pointer;text-align:center;transition:background .15s}
+.chara-cell:active{background:var(--bg3)}
+.chara-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500;border:2px solid}
+.chara-name{font-size:13px;font-weight:500}
+.chara-count{font-size:10px;color:var(--text2)}
 
-/* Filter tabs */
-.filter-tabs {
-  display:flex; gap:8px; padding:12px 20px;
-  overflow-x:auto; scrollbar-width:none;
-}
-.filter-tabs::-webkit-scrollbar { display:none; }
-.filter-tab {
-  padding:6px 14px; border-radius:20px;
-  background:var(--bg2); border:1px solid var(--border);
-  color:var(--text2); font-size:13px;
-  white-space:nowrap; cursor:pointer;
-  transition: all .2s;
-}
-.filter-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+/* MODALS */
+.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border-radius:18px 18px 0 0;width:100%;max-width:500px;max-height:92dvh;overflow-y:auto;padding:18px 18px 30px;animation:slideUp .3s ease-out}
+@keyframes slideUp{from{transform:translateY(100%)}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px}
+.modal h2{font-size:16px;font-weight:500;margin-bottom:14px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;resize:vertical}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group textarea{min-height:180px;line-height:1.7}
+.form-actions{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;padding:12px;border-radius:11px;border:none;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;transition:opacity .15s}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-cancel{background:var(--bg3);color:var(--text2)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{flex:none;padding:8px 14px;font-size:12px}
 
-/* Log list */
-.log-list { padding: 8px 16px 100px; }
-.log-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: transform .15s, border-color .2s;
-  position: relative;
-}
-.log-card:active { transform:scale(.98); }
-.log-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
-.log-title { font-size:15px; font-weight:500; flex:1; margin-right:8px; }
-.log-star { background:none; border:none; font-size:18px; cursor:pointer; padding:2px; }
-.log-meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.log-date { font-size:12px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
-.log-tag {
-  font-size:11px; padding:2px 8px; border-radius:10px;
-  font-weight:500;
-}
-.log-tag.claude { background:rgba(232,168,124,.15); color:var(--tag-claude); }
-.log-tag.chatgpt { background:rgba(116,215,160,.15); color:var(--tag-chatgpt); }
-.log-tag.other { background:rgba(116,185,255,.15); color:var(--tag-other); }
-.log-preview {
-  font-size:13px; color:var(--text2);
-  margin-top:8px;
-  display:-webkit-box; -webkit-line-clamp:2;
-  -webkit-box-orient:vertical; overflow:hidden;
-  line-height:1.6;
-}
+.chara-check-grid{display:flex;flex-wrap:wrap;gap:6px}
+.chara-check{padding:4px 10px;border-radius:14px;font-size:12px;cursor:pointer;border:1.5px solid;opacity:.5;transition:all .15s;user-select:none}
+.chara-check.selected{opacity:1;box-shadow:0 0 8px rgba(255,255,255,.1)}
 
-/* Empty state */
-.empty-state {
-  text-align:center; padding:80px 20px; color:var(--text2);
-}
-.empty-state .icon { font-size:48px; margin-bottom:16px; opacity:.5; }
-.empty-state p { font-size:14px; line-height:1.8; }
+.view-wrap{position:relative;border-radius:10px;overflow:hidden;margin-bottom:12px}
+.view-wp{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0;pointer-events:none}
+.view-content{position:relative;z-index:1;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.8;color:var(--text);max-height:55dvh;overflow-y:auto;padding:16px;background:rgba(10,10,18,.75)}
+.view-actions{display:flex;gap:6px;flex-wrap:wrap}
 
-/* FAB */
-.fab {
-  position:fixed; bottom:28px; right:20px;
-  width:58px; height:58px; border-radius:50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border:none; color:#fff; font-size:28px;
-  cursor:pointer; z-index:50;
-  box-shadow: 0 4px 20px rgba(108,92,231,.4);
-  transition: transform .15s;
-}
-.fab:active { transform:scale(.9); }
+.wp-preview{width:100%;height:120px;border-radius:10px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--bg);color:var(--text3);font-size:13px;position:relative;margin-bottom:8px}
+.wp-preview img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.wp-clear{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:12px;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center}
+.slider-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.slider-row label{font-size:12px;color:var(--text2);white-space:nowrap;min-width:60px}
+.slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.slider-row .val{font-size:12px;color:var(--text2);min-width:30px;text-align:right;font-family:monospace}
+.color-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.color-row label{font-size:12px;color:var(--text2);min-width:40px}
+.color-row input[type=color]{width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;background:none}
+.append-hint{background:rgba(108,92,231,.08);border:1px dashed rgba(108,92,231,.3);border-radius:10px;padding:8px 12px;font-size:11px;color:var(--accent2);margin-bottom:10px;text-align:center;line-height:1.6}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:18px;font-size:12px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
 
-/* ===== MODAL (Add/Edit/View) ===== */
-.modal-overlay {
-  position:fixed; inset:0; z-index:200;
-  background:rgba(0,0,0,.6);
-  backdrop-filter:blur(4px);
-  display:none; align-items:flex-end; justify-content:center;
-}
-.modal-overlay.show { display:flex; }
-.modal {
-  background:var(--bg2);
-  border-radius:20px 20px 0 0;
-  width:100%; max-width:500px;
-  max-height:92dvh;
-  overflow-y:auto;
-  padding:20px 20px 32px;
-  animation: slideUp .3s ease-out;
-}
-@keyframes slideUp { from { transform:translateY(100%); } }
-.modal-handle {
-  width:40px; height:4px; background:var(--border);
-  border-radius:2px; margin:0 auto 16px;
-}
-.modal h2 { font-size:18px; font-weight:500; margin-bottom:16px; }
-
-.form-group { margin-bottom:14px; }
-.form-group label { display:block; font-size:13px; color:var(--text2); margin-bottom:6px; }
-.form-group input, .form-group textarea, .form-group select {
-  width:100%; padding:11px 14px;
-  background:var(--bg); border:1px solid var(--border);
-  border-radius:10px; color:var(--text);
-  font-size:15px; font-family:'Noto Sans JP',sans-serif;
-  outline:none; resize:vertical;
-}
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-  border-color:var(--accent);
-}
-.form-group textarea { min-height:200px; line-height:1.7; }
-.form-group select { appearance:none; }
-
-.form-actions { display:flex; gap:10px; margin-top:18px; }
-.btn {
-  flex:1; padding:13px; border-radius:12px;
-  border:none; font-size:15px; font-weight:500;
-  font-family:'Noto Sans JP',sans-serif;
-  cursor:pointer; transition: opacity .15s;
-}
-.btn:active { opacity:.8; }
-.btn-primary { background:var(--accent); color:#fff; }
-.btn-cancel { background:var(--bg3); color:var(--text2); }
-.btn-danger { background:var(--danger); color:#fff; }
-
-/* View mode */
-.view-content {
-  white-space:pre-wrap; word-break:break-word;
-  font-size:14px; line-height:1.8;
-  color:var(--text);
-  max-height:60dvh; overflow-y:auto;
-  background:var(--bg);
-  border-radius:10px; padding:16px;
-  margin-bottom:14px;
-  font-family:'Noto Sans JP',sans-serif;
-}
-.view-actions { display:flex; gap:8px; }
-
-/* Settings modal */
-.setting-row {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:14px 0; border-bottom:1px solid var(--border);
-}
-.setting-row:last-child { border:none; }
-.setting-label { font-size:14px; }
-.setting-desc { font-size:12px; color:var(--text2); margin-top:2px; }
-.pin-input-row { display:flex; gap:8px; margin-top:8px; }
-.pin-input-row input {
-  width:45px; height:45px; text-align:center;
-  font-size:20px; font-family:'JetBrains Mono',monospace;
-  background:var(--bg); border:1px solid var(--border);
-  border-radius:10px; color:var(--text); outline:none;
-  -webkit-text-security: disc;
-}
-
-/* toast */
-.toast {
-  position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-  background:var(--bg3); color:var(--text);
-  padding:10px 20px; border-radius:20px;
-  font-size:13px; z-index:999;
-  opacity:0; transition:opacity .3s;
-  pointer-events:none;
-}
-.toast.show { opacity:1; }
-
-/* Append hint */
-.append-hint {
-  background: rgba(108,92,231,.1);
-  border: 1px dashed var(--accent);
-  border-radius:10px;
-  padding:10px 14px;
-  font-size:12px;
-  color:var(--accent2);
-  margin-bottom:10px;
-  text-align:center;
-  line-height:1.6;
-}
+#sCharaLogs .wp-layer{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0;pointer-events:none}
+#sCharaLogs .screen-content{position:relative;z-index:1;display:flex;flex-direction:column;height:100%}
 </style>
 </head>
 <body>
 
-<!-- Lock Screen -->
-<div id="lockScreen">
-  <div class="lock-icon">🔒</div>
+<div class="screen active" id="sLock">
   <h2>Secret Log</h2>
-  <div class="pin-dots" id="pinDots">
-    <div class="pin-dot"></div><div class="pin-dot"></div>
-    <div class="pin-dot"></div><div class="pin-dot"></div>
+  <div class="pattern-grid" id="patternGrid">
+    <canvas class="pattern-canvas" id="patternCanvas"></canvas>
   </div>
-  <div class="numpad" id="numpad">
-    <button onclick="pinInput('1')">1</button>
-    <button onclick="pinInput('2')">2</button>
-    <button onclick="pinInput('3')">3</button>
-    <button onclick="pinInput('4')">4</button>
-    <button onclick="pinInput('5')">5</button>
-    <button onclick="pinInput('6')">6</button>
-    <button onclick="pinInput('7')">7</button>
-    <button onclick="pinInput('8')">8</button>
-    <button onclick="pinInput('9')">9</button>
-    <button disabled></button>
-    <button onclick="pinInput('0')">0</button>
-    <button class="del-btn" onclick="pinDelete()">DEL</button>
-  </div>
-  <p id="lockMsg" style="font-size:12px;color:var(--text2);margin-top:8px;min-height:18px;"></p>
+  <div class="lock-sub" id="lockMsg">パターンを描いてね</div>
 </div>
 
-<!-- Main App -->
-<div id="app">
+<div class="screen" id="sMain">
   <div class="header">
     <div class="header-top">
       <h1>🔐 Secret Log</h1>
       <div class="header-actions">
-        <button onclick="toggleSearch()" title="検索">🔍</button>
-        <button onclick="openSettings()" title="設定">⚙️</button>
+        <button onclick="toggleSearch()">🔍</button>
+        <button onclick="openSettings()">⚙️</button>
       </div>
     </div>
     <div class="search-bar" id="searchBar">
       <input type="text" id="searchInput" placeholder="ログを検索..." oninput="renderList()">
     </div>
   </div>
-
-  <div class="filter-tabs" id="filterTabs">
-    <div class="filter-tab active" data-filter="all" onclick="setFilter('all')">すべて</div>
-    <div class="filter-tab" data-filter="star" onclick="setFilter('star')">⭐ お気に入り</div>
-    <div class="filter-tab" data-filter="claude" onclick="setFilter('claude')">Claude</div>
-    <div class="filter-tab" data-filter="chatgpt" onclick="setFilter('chatgpt')">ChatGPT</div>
-    <div class="filter-tab" data-filter="other" onclick="setFilter('other')">その他</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-t="list" onclick="switchMainTab('list')">📝 ログ一覧</div>
+    <div class="nav-tab" data-t="chara" onclick="switchMainTab('chara')">👤 キャラ別</div>
   </div>
-
-  <div class="log-list" id="logList"></div>
+  <div id="tabList" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div class="filter-chips" id="filterChips"></div>
+    <div class="log-list" id="logList"></div>
+  </div>
+  <div id="tabChara" style="display:none;flex:1;overflow:hidden">
+    <div class="chara-grid" id="charaGrid"></div>
+  </div>
   <button class="fab" onclick="openAdd()">＋</button>
 </div>
 
-<!-- Add/Edit Modal -->
+<div class="screen" id="sCharaLogs" style="position:relative;overflow:hidden">
+  <div class="wp-layer" id="charaWpLayer"></div>
+  <div class="screen-content">
+    <div class="header" style="background:rgba(10,10,18,.8)">
+      <div class="header-top">
+        <button onclick="goBack()" style="background:none;border:none;color:var(--text2);font-size:16px;cursor:pointer;margin-right:8px">←</button>
+        <h1 id="charaLogsTitle" style="flex:1"></h1>
+        <div class="header-actions">
+          <button onclick="openCharaWpSetting()">🖼️</button>
+        </div>
+      </div>
+    </div>
+    <div class="log-list" id="charaLogList" style="background:rgba(10,10,18,.6)"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <div class="modal-handle"></div>
-    <h2 id="editTitle">新しいログ</h2>
-    <div class="append-hint">📋 ペーストするたびに追記されます。何回でも貼り付けOK！</div>
-    <div class="form-group">
-      <label>タイトル</label>
-      <input type="text" id="fTitle" placeholder="会話のタイトル">
+    <h2 id="editModalTitle">新しいログ</h2>
+    <div class="append-hint">📋 何回でもペーストOK！自動で追記されるよ</div>
+    <div class="form-group"><label>タイトル</label><input type="text" id="fTitle" placeholder="会話のタイトル"></div>
+    <div class="form-group"><label>AI</label>
+      <select id="fTag"><option value="claude">Claude</option><option value="chatgpt">ChatGPT</option><option value="grok">Grok</option><option value="api">API</option><option value="other">その他</option></select>
     </div>
-    <div class="form-group">
-      <label>AI</label>
-      <select id="fTag">
-        <option value="claude">Claude</option>
-        <option value="chatgpt">ChatGPT</option>
-        <option value="other">その他</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>ログ内容</label>
-      <textarea id="fContent" placeholder="ここに会話をペースト..."></textarea>
-    </div>
+    <div class="form-group"><label>キャラ（複数OK）</label><div class="chara-check-grid" id="fCharas"></div></div>
+    <div class="form-group"><label>ログ内容</label><textarea id="fContent" placeholder="ここに会話をペースト..."></textarea></div>
     <div class="form-actions">
       <button class="btn btn-cancel" onclick="closeModal('editModal')">キャンセル</button>
       <button class="btn btn-primary" id="saveBtn" onclick="saveLog()">保存</button>
@@ -373,59 +203,73 @@ body {
   </div>
 </div>
 
-<!-- View Modal -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <h2 id="viewTitle" style="margin:0;flex:1;"></h2>
-      <span id="viewTag" class="log-tag" style="margin-left:8px;"></span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 id="viewTitle" style="margin:0;flex:1"></h2>
     </div>
-    <div id="viewDate" style="font-size:12px;color:var(--text2);margin-bottom:12px;font-family:'JetBrains Mono',monospace;"></div>
-    <div class="view-content" id="viewContent"></div>
+    <div id="viewMeta" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px"></div>
+    <div class="view-wrap"><div class="view-wp" id="viewWp"></div><div class="view-content" id="viewContent"></div></div>
     <div class="view-actions">
       <button class="btn btn-cancel" onclick="closeModal('viewModal')">閉じる</button>
-      <button class="btn btn-primary" onclick="editCurrent()">✏️ 編集</button>
-      <button class="btn btn-danger" onclick="deleteCurrent()">🗑</button>
+      <button class="btn btn-primary btn-sm" onclick="copyAll()">📋 コピー</button>
+      <button class="btn btn-primary btn-sm" onclick="editCurrent()">✏️ 編集</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCurrent()">🗑</button>
     </div>
   </div>
 </div>
 
-<!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal">
     <div class="modal-handle"></div>
     <h2>設定</h2>
-    <div class="setting-row">
-      <div>
-        <div class="setting-label">PINコード変更</div>
-        <div class="setting-desc">4桁の数字</div>
-      </div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;margin-bottom:8px">パターン変更</div>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="startPatternChange()">新しいパターンを設定</button>
     </div>
-    <div class="pin-input-row" id="newPinRow">
-      <input type="tel" maxlength="1" oninput="pinFieldNext(this,0)">
-      <input type="tel" maxlength="1" oninput="pinFieldNext(this,1)">
-      <input type="tel" maxlength="1" oninput="pinFieldNext(this,2)">
-      <input type="tel" maxlength="1" oninput="pinFieldNext(this,3)">
-      <button class="btn btn-primary" style="flex:none;padding:10px 16px;" onclick="changePin()">変更</button>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;margin-bottom:8px">キャラ色カスタマイズ</div>
+      <div id="charaColorList"></div>
     </div>
-    <div class="setting-row">
-      <div>
-        <div class="setting-label">データエクスポート</div>
-        <div class="setting-desc">JSONファイルで書き出し</div>
-      </div>
-      <button class="btn btn-primary" style="flex:none;padding:8px 16px;font-size:13px;" onclick="exportData()">出力</button>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:14px">エクスポート</span>
+      <button class="btn btn-primary btn-sm" onclick="exportData()">出力</button>
     </div>
-    <div class="setting-row">
-      <div>
-        <div class="setting-label">データインポート</div>
-        <div class="setting-desc">JSONファイルから復元</div>
-      </div>
-      <button class="btn btn-primary" style="flex:none;padding:8px 16px;font-size:13px;" onclick="importData()">読込</button>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:14px">インポート</span>
+      <button class="btn btn-primary btn-sm" onclick="importData()">読込</button>
     </div>
-    <div style="margin-top:16px;">
-      <button class="btn btn-cancel" style="width:100%;" onclick="closeModal('settingsModal')">閉じる</button>
+    <button class="btn btn-cancel" style="width:100%;margin-top:14px" onclick="closeModal('settingsModal')">閉じる</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="charaWpModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="charaWpTitle">壁紙設定</h2>
+    <div class="wp-preview" id="cwpPreview" onclick="document.getElementById('cwpInput').click()">タップして画像を選択</div>
+    <input type="file" id="cwpInput" accept="image/*" style="display:none" onchange="onCwpImage(event)">
+    <div class="slider-row">
+      <label>透明度</label>
+      <input type="range" id="cwpOpacity" min="5" max="80" value="25" oninput="document.getElementById('cwpOVal').textContent=this.value">
+      <span class="val" id="cwpOVal">25</span>
     </div>
+    <div class="form-actions">
+      <button class="btn btn-cancel" onclick="closeModal('charaWpModal')">キャンセル</button>
+      <button class="btn btn-danger btn-sm" onclick="clearCharaWp()">クリア</button>
+      <button class="btn btn-primary" onclick="saveCharaWp()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="patternChangeModal">
+  <div class="modal" style="display:flex;flex-direction:column;align-items:center;padding-top:30px;padding-bottom:40px">
+    <div class="modal-handle"></div>
+    <h2 style="margin-bottom:6px">新しいパターン</h2>
+    <div id="pcMsg" style="font-size:12px;color:var(--text2);margin-bottom:20px;min-height:18px">新しいパターンを描いてね</div>
+    <div class="pattern-grid" id="pcGrid"><canvas class="pattern-canvas" id="pcCanvas"></canvas></div>
+    <div style="margin-top:20px"><button class="btn btn-cancel btn-sm" onclick="closeModal('patternChangeModal')">キャンセル</button></div>
   </div>
 </div>
 
@@ -433,301 +277,319 @@ body {
 <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
 
 <script>
-// ===== DATA =====
-const DB_KEY = 'secretlog_data';
-const PIN_KEY = 'secretlog_pin';
+const CHARAS=[
+  {id:'yukima',name:'雪間',kanji:'雪',color:'#8ec8e8'},
+  {id:'shizuma',name:'静間',kanji:'静',color:'#7b9fd4'},
+  {id:'yuma',name:'優真',kanji:'優',color:'#7ecba1'},
+  {id:'mao',name:'真雄',kanji:'真',color:'#c9a84c'},
+  {id:'monday',name:'Monday',kanji:'M',color:'#a29bfe'},
+  {id:'hibima',name:'響間',kanji:'響',color:'#9e9e9e'},
+  {id:'chiaki',name:'千晟',kanji:'千',color:'#d4849a'},
+  {id:'ema',name:'慧真',kanji:'慧',color:'#7ecc5a'},
+  {id:'haruma',name:'遙真',kanji:'遙',color:'#cba87e'},
+  {id:'haruto',name:'晴翔',kanji:'晴',color:'#c9a84c'}
+];
+const AI_LABELS={claude:'Claude',chatgpt:'ChatGPT',grok:'Grok',api:'API',other:'その他'};
 
-function getData() {
-  try { return JSON.parse(localStorage.getItem(DB_KEY)) || []; }
-  catch { return []; }
-}
-function setData(d) { localStorage.setItem(DB_KEY, JSON.stringify(d)); }
-function getPin() { return localStorage.getItem(PIN_KEY) || '0000'; }
-function setPin(p) { localStorage.setItem(PIN_KEY, p); }
+const S=k=>{try{return JSON.parse(localStorage.getItem('sl_'+k))}catch{return null}};
+const SS=(k,v)=>localStorage.setItem('sl_'+k,JSON.stringify(v));
+const getLogs=()=>S('logs')||[];
+const setLogs=d=>SS('logs',d);
+const getPattern=()=>S('pattern');
+const setPattern=p=>SS('pattern',p);
+const getCharaColors=()=>S('cc')||{};
+const setCharaColors=c=>SS('cc',c);
+const getCharaWp=id=>S('wp_'+id)||{};
+const setCharaWp=(id,v)=>SS('wp_'+id,v);
+const charaColor=id=>{const c=getCharaColors();return c[id]||(CHARAS.find(x=>x.id===id)||{}).color||'#888'};
 
-// ===== LOCK =====
-let pinBuffer = '';
-let isFirstTime = !localStorage.getItem(PIN_KEY);
+// PATTERN LOCK
+let PS={dots:[],sel:[],drawing:false,canvas:null,ctx:null,grid:null,resolve:null,mode:'lock'};
 
-if (isFirstTime) {
-  document.getElementById('lockMsg').textContent = '初回PINを設定してください（4桁）';
-}
-
-function pinInput(n) {
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += n;
-  updateDots();
-  if (pinBuffer.length === 4) {
-    setTimeout(() => {
-      if (isFirstTime) {
-        setPin(pinBuffer);
-        isFirstTime = false;
-        unlock();
-        toast('PINを設定しました');
-      } else if (pinBuffer === getPin()) {
-        unlock();
-      } else {
-        const dots = document.querySelectorAll('.pin-dot');
-        dots.forEach(d => d.classList.add('error'));
-        document.getElementById('lockMsg').textContent = 'PINが違います';
-        setTimeout(() => {
-          pinBuffer = '';
-          updateDots();
-          dots.forEach(d => d.classList.remove('error'));
-          document.getElementById('lockMsg').textContent = '';
-        }, 600);
-      }
-    }, 150);
+function initPG(gridEl,canvasEl,mode){
+  gridEl.innerHTML='';
+  PS.grid=gridEl;PS.canvas=canvasEl;PS.sel=[];PS.drawing=false;PS.mode=mode;PS.dots=[];
+  const rect=gridEl.getBoundingClientRect();
+  canvasEl.width=rect.width;canvasEl.height=rect.height;
+  PS.ctx=canvasEl.getContext('2d');
+  gridEl.appendChild(canvasEl);
+  for(let i=0;i<9;i++){
+    const w=document.createElement('div');w.className='pattern-dot-wrap';w.dataset.idx=i;
+    const d=document.createElement('div');d.className='pattern-dot';d.id=(mode==='lock'?'pd':'pcd')+i;
+    w.appendChild(d);gridEl.appendChild(w);
   }
-}
-
-function pinDelete() {
-  pinBuffer = pinBuffer.slice(0, -1);
-  updateDots();
-}
-
-function updateDots() {
-  document.querySelectorAll('.pin-dot').forEach((d, i) => {
-    d.classList.toggle('filled', i < pinBuffer.length);
+  requestAnimationFrame(()=>{
+    const gR=gridEl.getBoundingClientRect();PS.dots=[];
+    gridEl.querySelectorAll('.pattern-dot-wrap').forEach((w,i)=>{
+      const r=w.getBoundingClientRect();
+      PS.dots.push({idx:i,x:r.left-gR.left+r.width/2,y:r.top-gR.top+r.height/2});
+    });
   });
+  gridEl.onpointerdown=e=>{e.preventDefault();pS(e)};
+  gridEl.onpointermove=e=>{e.preventDefault();pM(e)};
+  gridEl.onpointerup=e=>{e.preventDefault();pE()};
 }
 
-function unlock() {
-  document.getElementById('lockScreen').classList.add('hide');
-  document.getElementById('app').classList.add('show');
-  renderList();
+function pS(e){PS.sel=[];PS.drawing=true;clrD();pM(e)}
+function pM(e){
+  if(!PS.drawing)return;
+  const gR=PS.grid.getBoundingClientRect(),x=e.clientX-gR.left,y=e.clientY-gR.top;
+  for(const d of PS.dots){
+    if(PS.sel.includes(d.idx))continue;
+    if(Math.hypot(x-d.x,y-d.y)<30){
+      PS.sel.push(d.idx);
+      document.getElementById((PS.mode==='lock'?'pd':'pcd')+d.idx).classList.add('active');
+    }
+  }
+  drawL(x,y);
+}
+function pE(){
+  PS.drawing=false;drawL();
+  if(PS.sel.length>=3){if(PS.resolve)PS.resolve(PS.sel.join(''))}
+  else setTimeout(()=>{clrD();drawL()},300);
+}
+function clrD(){const p=PS.mode==='lock'?'pd':'pcd';for(let i=0;i<9;i++){const e=document.getElementById(p+i);if(e){e.classList.remove('active','error')}}}
+function drawL(cx,cy){
+  const c=PS.ctx;if(!c)return;
+  c.clearRect(0,0,PS.canvas.width,PS.canvas.height);
+  if(PS.sel.length<1)return;
+  c.strokeStyle='rgba(162,155,254,.5)';c.lineWidth=3;c.lineCap='round';c.beginPath();
+  PS.sel.forEach((idx,i)=>{const d=PS.dots[idx];i===0?c.moveTo(d.x,d.y):c.lineTo(d.x,d.y)});
+  if(cx!==undefined&&PS.drawing)c.lineTo(cx,cy);
+  c.stroke();
+}
+function showErr(){
+  const p=PS.mode==='lock'?'pd':'pcd';
+  PS.sel.forEach(i=>{const e=document.getElementById(p+i);e.classList.remove('active');e.classList.add('error')});
+  const c=PS.ctx;c.clearRect(0,0,PS.canvas.width,PS.canvas.height);
+  c.strokeStyle='rgba(231,76,108,.5)';c.lineWidth=3;c.beginPath();
+  PS.sel.forEach((idx,i)=>{const d=PS.dots[idx];i===0?c.moveTo(d.x,d.y):c.lineTo(d.x,d.y)});
+  c.stroke();
+  setTimeout(()=>{PS.sel=[];clrD();drawL()},500);
+}
+function waitP(){return new Promise(r=>{PS.resolve=r})}
+
+async function lockFlow(){
+  const saved=getPattern(),msg=document.getElementById('lockMsg');
+  if(!saved){
+    msg.textContent='新しいパターンを描いてね（3点以上）';
+    initPG(document.getElementById('patternGrid'),document.getElementById('patternCanvas'),'lock');
+    const p1=await waitP();
+    msg.textContent='もう一度同じパターンを描いてね';
+    setTimeout(()=>{clrD();drawL()},400);
+    await new Promise(r=>setTimeout(r,500));PS.sel=[];
+    const p2=await waitP();
+    if(p1===p2){setPattern(p1);toast('パターンを設定しました');unlock()}
+    else{showErr();msg.textContent='一致しなかった。もう一度';setTimeout(()=>lockFlow(),800)}
+  } else {
+    msg.textContent='パターンを描いてね';
+    initPG(document.getElementById('patternGrid'),document.getElementById('patternCanvas'),'lock');
+    const p=await waitP();
+    if(p===saved) unlock();
+    else{showErr();msg.textContent='パターンが違うよ';setTimeout(()=>lockFlow(),800)}
+  }
+}
+function unlock(){goScreen('sMain');renderAll()}
+
+function goScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+
+let mainTab='list';
+function switchMainTab(t){
+  mainTab=t;
+  document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
+  document.getElementById('tabList').style.display=t==='list'?'flex':'none';
+  document.getElementById('tabChara').style.display=t==='chara'?'block':'none';
+  if(t==='chara')renderCharaGrid();
 }
 
-// ===== FILTER & SEARCH =====
-let currentFilter = 'all';
-
-function setFilter(f) {
-  currentFilter = f;
-  document.querySelectorAll('.filter-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.filter === f);
+let activeAI='all',activeChara=null;
+function renderChips(){
+  const el=document.getElementById('filterChips');
+  let h='<div class="chip '+(activeAI==='all'?'active':'')+'" onclick="setAI(\'all\')">すべて</div>';
+  h+='<div class="chip '+(activeAI==='star'?'active':'')+'" onclick="setAI(\'star\')">⭐</div>';
+  ['claude','chatgpt','grok','api','other'].forEach(t=>{
+    h+=`<div class="chip ${activeAI===t?'active':''}" onclick="setAI('${t}')">${AI_LABELS[t]}</div>`;
   });
-  renderList();
+  CHARAS.forEach(c=>{
+    const col=charaColor(c.id),sel=activeChara===c.id;
+    h+=`<div class="chip" style="border-color:${col};${sel?'background:'+col+';color:#000;opacity:1':'opacity:.6'}" onclick="setCF('${c.id}')">${c.name}</div>`;
+  });
+  el.innerHTML=h;
+}
+function setAI(f){activeAI=f;activeChara=null;renderChips();renderList()}
+function setCF(id){activeChara=activeChara===id?null:id;activeAI='all';renderChips();renderList()}
+
+function renderList(){
+  const el=document.getElementById('logList');
+  let logs=getLogs();const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  if(activeAI==='star')logs=logs.filter(l=>l.star);
+  else if(activeAI!=='all')logs=logs.filter(l=>l.tag===activeAI);
+  if(activeChara)logs=logs.filter(l=>l.charas&&l.charas.includes(activeChara));
+  if(q)logs=logs.filter(l=>l.title.toLowerCase().includes(q)||l.content.toLowerCase().includes(q));
+  logs.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!logs.length){el.innerHTML='<div class="empty-state"><div class="icon">📝</div><p>ログがありません<br>＋ボタンで追加しよう</p></div>';return}
+  el.innerHTML=logs.map(l=>{
+    const ct=(l.charas||[]).map(cid=>{const c=CHARAS.find(x=>x.id===cid);return c?`<span class="chara-mini-tag" style="border-color:${charaColor(cid)};color:${charaColor(cid)}">${c.name}</span>`:''}).join('');
+    return `<div class="log-card" onclick="viewLog('${l.id}')"><div class="log-card-top"><div class="log-title">${esc(l.title)}</div><button class="log-star" onclick="event.stopPropagation();toggleStar('${l.id}')">${l.star?'⭐':'☆'}</button></div><div class="log-meta"><span class="log-date">${fmtD(l.date)}</span><span class="tag tag-${l.tag}">${AI_LABELS[l.tag]||l.tag}</span></div>${ct?'<div class="log-chara-tags">'+ct+'</div>':''}<div class="log-preview">${esc(l.content)}</div></div>`;
+  }).join('');
+}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtD(d){const t=new Date(d);return t.toLocaleDateString('ja-JP')+'  '+t.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}
+function toggleStar(id){const d=getLogs(),i=d.findIndex(l=>l.id===id);if(i>=0){d[i].star=!d[i].star;setLogs(d);renderList()}}
+function toggleSearch(){const b=document.getElementById('searchBar');b.classList.toggle('show');if(b.classList.contains('show'))document.getElementById('searchInput').focus();else{document.getElementById('searchInput').value='';renderList()}}
+
+function renderCharaGrid(){
+  const logs=getLogs(),el=document.getElementById('charaGrid');
+  el.innerHTML=CHARAS.map(c=>{
+    const col=charaColor(c.id),cnt=logs.filter(l=>l.charas&&l.charas.includes(c.id)).length;
+    return `<div class="chara-cell" onclick="openCL('${c.id}')"><div class="chara-avatar" style="border-color:${col};color:${col}">${c.kanji}</div><div class="chara-name">${c.name}</div><div class="chara-count">${cnt}件</div></div>`;
+  }).join('');
 }
 
-function toggleSearch() {
-  const bar = document.getElementById('searchBar');
-  bar.classList.toggle('show');
-  if (bar.classList.contains('show')) {
-    document.getElementById('searchInput').focus();
-  } else {
-    document.getElementById('searchInput').value = '';
-    renderList();
-  }
+let curChara=null;
+function openCL(id){
+  curChara=id;const c=CHARAS.find(x=>x.id===id);
+  const h=document.getElementById('charaLogsTitle');
+  h.textContent=c.name+' のログ';
+  h.style.cssText=`background:linear-gradient(135deg,${charaColor(id)},var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;flex:1;font-size:18px;font-weight:500`;
+  applyWp(id);renderCLL(id);goScreen('sCharaLogs');
+}
+function applyWp(id){
+  const wp=getCharaWp(id),l=document.getElementById('charaWpLayer');
+  if(wp.img){l.style.backgroundImage=`url(${wp.img})`;l.style.opacity=(wp.opacity||25)/100}
+  else{l.style.backgroundImage='';l.style.opacity=0}
+}
+function renderCLL(id){
+  const el=document.getElementById('charaLogList');
+  let logs=getLogs().filter(l=>l.charas&&l.charas.includes(id));
+  logs.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!logs.length){el.innerHTML='<div class="empty-state"><div class="icon">📝</div><p>まだログがないよ</p></div>';return}
+  el.innerHTML=logs.map(l=>`<div class="log-card" style="background:rgba(22,22,42,.7)" onclick="viewLog('${l.id}')"><div class="log-card-top"><div class="log-title">${esc(l.title)}</div><button class="log-star" onclick="event.stopPropagation();toggleStar('${l.id}')">${l.star?'⭐':'☆'}</button></div><div class="log-meta"><span class="log-date">${fmtD(l.date)}</span><span class="tag tag-${l.tag}">${AI_LABELS[l.tag]||l.tag}</span></div><div class="log-preview">${esc(l.content)}</div></div>`).join('');
+}
+function goBack(){goScreen('sMain');switchMainTab('chara')}
+
+let editId=null,selCharas=[];
+function openAdd(){
+  editId=null;selCharas=[];
+  document.getElementById('editModalTitle').textContent='新しいログ';
+  document.getElementById('fTitle').value='';document.getElementById('fTag').value='claude';
+  document.getElementById('fContent').value='';document.getElementById('saveBtn').textContent='保存';
+  renderCC();openModal('editModal');setupAp();
+}
+function renderCC(){
+  document.getElementById('fCharas').innerHTML=CHARAS.map(c=>{
+    const col=charaColor(c.id),sel=selCharas.includes(c.id);
+    return `<div class="chara-check ${sel?'selected':''}" style="border-color:${col};color:${col};${sel?'background:'+col+'22':''}" onclick="tCC('${c.id}')">${c.name}</div>`;
+  }).join('');
+}
+function tCC(id){selCharas.includes(id)?selCharas=selCharas.filter(x=>x!==id):selCharas.push(id);renderCC()}
+function setupAp(){
+  document.getElementById('fContent').onpaste=function(e){
+    if(!this.value.trim())return;
+    e.preventDefault();const t=(e.clipboardData||window.clipboardData).getData('text');
+    this.value+='\n\n── ── ── ── ──\n\n'+t;this.scrollTop=this.scrollHeight;toast('追記しました');
+  };
+}
+function editCurrent(){
+  const d=getLogs(),l=d.find(x=>x.id===viewingId);if(!l)return;
+  closeModal('viewModal');editId=l.id;selCharas=l.charas?[...l.charas]:[];
+  document.getElementById('editModalTitle').textContent='ログを編集';
+  document.getElementById('fTitle').value=l.title;document.getElementById('fTag').value=l.tag;
+  document.getElementById('fContent').value=l.content;document.getElementById('saveBtn').textContent='更新';
+  renderCC();setTimeout(()=>{openModal('editModal');setupAp()},300);
+}
+function saveLog(){
+  const title=document.getElementById('fTitle').value.trim(),tag=document.getElementById('fTag').value,content=document.getElementById('fContent').value.trim();
+  if(!title||!content){toast('タイトルと内容を入力してね');return}
+  const d=getLogs();
+  if(editId){const i=d.findIndex(l=>l.id===editId);if(i>=0){d[i].title=title;d[i].tag=tag;d[i].content=content;d[i].charas=selCharas;d[i].updated=new Date().toISOString()}}
+  else d.push({id:'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),title,tag,content,charas:selCharas,date:new Date().toISOString(),star:false});
+  setLogs(d);closeModal('editModal');renderAll();toast(editId?'更新しました':'保存しました');editId=null;
 }
 
-// ===== RENDER =====
-function renderList() {
-  const list = document.getElementById('logList');
-  let logs = getData();
-  const q = document.getElementById('searchInput').value.toLowerCase();
-
-  if (currentFilter === 'star') logs = logs.filter(l => l.star);
-  else if (currentFilter !== 'all') logs = logs.filter(l => l.tag === currentFilter);
-
-  if (q) logs = logs.filter(l =>
-    l.title.toLowerCase().includes(q) || l.content.toLowerCase().includes(q)
-  );
-
-  logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  if (!logs.length) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">📝</div><p>ログがありません<br>＋ボタンで追加しよう</p></div>`;
-    return;
-  }
-
-  list.innerHTML = logs.map(l => `
-    <div class="log-card" onclick="viewLog('${l.id}')">
-      <div class="log-card-header">
-        <div class="log-title">${esc(l.title)}</div>
-        <button class="log-star" onclick="event.stopPropagation();toggleStar('${l.id}')">${l.star ? '⭐' : '☆'}</button>
-      </div>
-      <div class="log-meta">
-        <span class="log-date">${formatDate(l.date)}</span>
-        <span class="log-tag ${l.tag}">${tagLabel(l.tag)}</span>
-      </div>
-      <div class="log-preview">${esc(l.content)}</div>
-    </div>
-  `).join('');
-}
-
-function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-function tagLabel(t) { return {claude:'Claude',chatgpt:'ChatGPT',other:'その他'}[t]||t; }
-function formatDate(d) { const dt=new Date(d); return dt.toLocaleDateString('ja-JP')+'  '+dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
-
-// ===== STAR =====
-function toggleStar(id) {
-  const d = getData();
-  const i = d.findIndex(l => l.id===id);
-  if (i>=0) { d[i].star = !d[i].star; setData(d); renderList(); }
-}
-
-// ===== ADD / EDIT =====
-let editId = null;
-let appendMode = false;
-
-function openAdd() {
-  editId = null;
-  appendMode = true;
-  document.getElementById('editTitle').textContent = '新しいログ';
-  document.getElementById('fTitle').value = '';
-  document.getElementById('fTag').value = 'claude';
-  document.getElementById('fContent').value = '';
-  document.getElementById('saveBtn').textContent = '保存';
-  openModal('editModal');
-  setupAppendMode();
-}
-
-function setupAppendMode() {
-  const ta = document.getElementById('fContent');
-  ta.addEventListener('paste', handlePaste);
-}
-
-function handlePaste(e) {
-  const ta = document.getElementById('fContent');
-  if (!appendMode || !ta.value.trim()) return; // first paste = normal
-  e.preventDefault();
-  const text = (e.clipboardData || window.clipboardData).getData('text');
-  const separator = '\n\n── ── ── ── ──\n\n';
-  ta.value += separator + text;
-  ta.scrollTop = ta.scrollHeight;
-  toast('追記しました');
-}
-
-function editCurrent() {
-  const d = getData();
-  const l = d.find(x => x.id === viewingId);
-  if (!l) return;
-  closeModal('viewModal');
-  editId = l.id;
-  appendMode = true;
-  document.getElementById('editTitle').textContent = 'ログを編集';
-  document.getElementById('fTitle').value = l.title;
-  document.getElementById('fTag').value = l.tag;
-  document.getElementById('fContent').value = l.content;
-  document.getElementById('saveBtn').textContent = '更新';
-  setTimeout(() => { openModal('editModal'); setupAppendMode(); }, 300);
-}
-
-function saveLog() {
-  const title = document.getElementById('fTitle').value.trim();
-  const tag = document.getElementById('fTag').value;
-  const content = document.getElementById('fContent').value.trim();
-  if (!title || !content) { toast('タイトルと内容を入力してね'); return; }
-
-  const d = getData();
-  if (editId) {
-    const i = d.findIndex(l => l.id===editId);
-    if (i>=0) { d[i].title=title; d[i].tag=tag; d[i].content=content; d[i].updated=new Date().toISOString(); }
-  } else {
-    d.push({ id: crypto.randomUUID(), title, tag, content, date: new Date().toISOString(), star: false });
-  }
-  setData(d);
-  closeModal('editModal');
-  renderList();
-  toast(editId ? '更新しました' : '保存しました');
-  editId = null;
-}
-
-// ===== VIEW =====
-let viewingId = null;
-
-function viewLog(id) {
-  const d = getData();
-  const l = d.find(x => x.id===id);
-  if (!l) return;
-  viewingId = id;
-  document.getElementById('viewTitle').textContent = l.title;
-  document.getElementById('viewTag').textContent = tagLabel(l.tag);
-  document.getElementById('viewTag').className = 'log-tag ' + l.tag;
-  document.getElementById('viewDate').textContent = formatDate(l.date);
-  document.getElementById('viewContent').textContent = l.content;
+let viewingId=null;
+function viewLog(id){
+  const d=getLogs(),l=d.find(x=>x.id===id);if(!l)return;viewingId=id;
+  document.getElementById('viewTitle').textContent=l.title;
+  let meta=`<span class="log-date">${fmtD(l.date)}</span><span class="tag tag-${l.tag}">${AI_LABELS[l.tag]||l.tag}</span>`;
+  (l.charas||[]).forEach(cid=>{const c=CHARAS.find(x=>x.id===cid);if(c)meta+=`<span class="chara-mini-tag" style="border-color:${charaColor(cid)};color:${charaColor(cid)}">${c.name}</span>`});
+  document.getElementById('viewMeta').innerHTML=meta;
+  document.getElementById('viewContent').textContent=l.content;
+  const wp=document.getElementById('viewWp'),vc=document.getElementById('viewContent');
+  let hasWp=false;
+  if(l.charas&&l.charas.length){const w=getCharaWp(l.charas[0]);if(w.img){wp.style.backgroundImage=`url(${w.img})`;wp.style.opacity=(w.opacity||25)/100;vc.style.background='rgba(10,10,18,.7)';hasWp=true}}
+  if(!hasWp){wp.style.backgroundImage='';wp.style.opacity=0;vc.style.background='var(--bg)'}
   openModal('viewModal');
 }
+function copyAll(){
+  const l=getLogs().find(x=>x.id===viewingId);if(!l)return;
+  navigator.clipboard.writeText(l.content).then(()=>toast('コピーしました')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=l.content;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('コピーしました');
+  });
+}
+function deleteCurrent(){if(!confirm('このログを削除しますか？'))return;setLogs(getLogs().filter(l=>l.id!==viewingId));closeModal('viewModal');renderAll();toast('削除しました')}
 
-function deleteCurrent() {
-  if (!confirm('このログを削除しますか？')) return;
-  let d = getData();
-  d = d.filter(l => l.id !== viewingId);
-  setData(d);
-  closeModal('viewModal');
-  renderList();
-  toast('削除しました');
+let wpTarget=null;
+function openCharaWpSetting(){
+  wpTarget=curChara;const c=CHARAS.find(x=>x.id===curChara);
+  document.getElementById('charaWpTitle').textContent=c.name+' の壁紙';
+  const wp=getCharaWp(curChara),pv=document.getElementById('cwpPreview');
+  if(wp.img)pv.innerHTML=`<img src="${wp.img}"><button class="wp-clear" onclick="event.stopPropagation();clrPv()">×</button>`;
+  else pv.innerHTML='タップして画像を選択';
+  pv.dataset.val=wp.img||'';
+  document.getElementById('cwpOpacity').value=wp.opacity||25;
+  document.getElementById('cwpOVal').textContent=wp.opacity||25;
+  openModal('charaWpModal');
+}
+function onCwpImage(e){const f=e.target.files[0];e.target.value='';if(!f)return;cmpImg(f,800,.6).then(d=>{const pv=document.getElementById('cwpPreview');pv.innerHTML=`<img src="${d}"><button class="wp-clear" onclick="event.stopPropagation();clrPv()">×</button>`;pv.dataset.val=d})}
+function clrPv(){const pv=document.getElementById('cwpPreview');pv.innerHTML='タップして画像を選択';pv.dataset.val=''}
+function saveCharaWp(){const img=document.getElementById('cwpPreview').dataset.val,op=parseInt(document.getElementById('cwpOpacity').value);setCharaWp(wpTarget,img?{img,opacity:op}:{});applyWp(wpTarget);closeModal('charaWpModal');toast('壁紙を保存しました')}
+function clearCharaWp(){setCharaWp(wpTarget,{});clrPv();applyWp(wpTarget);closeModal('charaWpModal');toast('壁紙をクリアしました')}
+function cmpImg(f,mw,q){return new Promise(r=>{const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');let w=im.width,h=im.height;if(w>mw){h=h*(mw/w);w=mw}c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);r(c.toDataURL('image/jpeg',q))};im.src=rd.result};rd.readAsDataURL(f)})}
+
+function openSettings(){renderCCL();openModal('settingsModal')}
+function renderCCL(){
+  document.getElementById('charaColorList').innerHTML=CHARAS.map(c=>{
+    const col=charaColor(c.id);
+    return `<div class="color-row"><label>${c.name}</label><div class="chara-avatar" style="width:28px;height:28px;font-size:11px;border-color:${col};color:${col};border-width:1.5px">${c.kanji}</div><input type="color" value="${col}" onchange="updCC('${c.id}',this.value)"></div>`;
+  }).join('');
+}
+function updCC(id,col){const c=getCharaColors();c[id]=col;setCharaColors(c);renderCCL();toast('色を変更しました')}
+
+async function startPatternChange(){
+  closeModal('settingsModal');openModal('patternChangeModal');
+  const msg=document.getElementById('pcMsg');msg.textContent='新しいパターンを描いてね';
+  await new Promise(r=>setTimeout(r,300));
+  initPG(document.getElementById('pcGrid'),document.getElementById('pcCanvas'),'change');
+  const p1=await waitP();
+  msg.textContent='もう一度同じパターンを描いてね';
+  setTimeout(()=>{clrD();drawL()},400);
+  await new Promise(r=>setTimeout(r,500));PS.sel=[];
+  const p2=await waitP();
+  if(p1===p2){setPattern(p1);toast('パターンを変更しました');closeModal('patternChangeModal')}
+  else{showErr();msg.textContent='一致しなかった';setTimeout(()=>startPatternChange(),800)}
 }
 
-// ===== SETTINGS =====
-function openSettings() { openModal('settingsModal'); }
-
-function pinFieldNext(el, idx) {
-  if (el.value && idx < 3) {
-    document.querySelectorAll('#newPinRow input')[idx+1].focus();
-  }
+function exportData(){
+  const data={logs:getLogs(),cc:getCharaColors(),pattern:getPattern()};
+  CHARAS.forEach(c=>{const w=getCharaWp(c.id);if(w.img)data['wp_'+c.id]=w});
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='secret-log-backup.json';a.click();toast('エクスポートしました');
+}
+function importData(){document.getElementById('importFile').click()}
+function handleImport(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.logs)setLogs(d.logs);if(d.cc)setCharaColors(d.cc);if(d.pattern)setPattern(d.pattern);CHARAS.forEach(c=>{if(d['wp_'+c.id])setCharaWp(c.id,d['wp_'+c.id])});renderAll();toast('インポートしました')}catch{toast('読み込めませんでした')}};
+  r.readAsText(f);e.target.value='';
 }
 
-function changePin() {
-  const inputs = document.querySelectorAll('#newPinRow input');
-  const p = Array.from(inputs).map(i => i.value).join('');
-  if (p.length !== 4 || !/^\d{4}$/.test(p)) { toast('4桁の数字を入力してね'); return; }
-  setPin(p);
-  inputs.forEach(i => i.value='');
-  toast('PINを変更しました');
-}
-
-function exportData() {
-  const d = getData();
-  const blob = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'secret-log-backup.json';
-  a.click();
-  toast('エクスポートしました');
-}
-
-function importData() { document.getElementById('importFile').click(); }
-
-function handleImport(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const imported = JSON.parse(ev.target.result);
-      if (!Array.isArray(imported)) throw 'bad';
-      const current = getData();
-      const ids = new Set(current.map(l => l.id));
-      let added = 0;
-      imported.forEach(l => { if (!ids.has(l.id)) { current.push(l); added++; } });
-      setData(current);
-      renderList();
-      toast(`${added}件インポートしました`);
-    } catch { toast('ファイルを読み込めませんでした'); }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-}
-
-// ===== MODAL UTILS =====
-function openModal(id) { document.getElementById(id).classList.add('show'); }
-function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
-  appendMode = false;
-}
-
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-// Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
-});
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)closeModal(o.id)})});
+function renderAll(){renderChips();renderList();renderCharaGrid();if(curChara)renderCLL(curChara)}
+document.addEventListener('DOMContentLoaded',()=>{lockFlow()});
 </script>
 </body>
 </html>
