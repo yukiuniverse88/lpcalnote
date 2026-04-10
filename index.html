@@ -29,6 +29,14 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
 .pattern-dot.active{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 12px rgba(162,155,254,.5)}
 .pattern-dot.error{background:var(--danger);border-color:var(--danger);box-shadow:0 0 12px rgba(231,76,108,.5)}
 .pattern-canvas{position:absolute;inset:0;pointer-events:none}
+.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:30px}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--text3);transition:all .15s}
+.pin-dot.filled{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 8px rgba(162,155,254,.4)}
+.pin-dot.error{background:var(--danger);border-color:var(--danger)}
+.numpad{display:grid;grid-template-columns:repeat(3,68px);gap:12px;justify-content:center}
+.numpad button{width:68px;height:68px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);font-size:22px;font-family:inherit;cursor:pointer;transition:all .15s}
+.numpad button:active{background:rgba(162,155,254,.2);transform:scale(.92)}
+.numpad .del-btn{font-size:12px;letter-spacing:1px;color:var(--text2);border-color:transparent;background:none}
 
 /* HEADER */
 .header{position:sticky;top:0;z-index:100;background:rgba(10,10,18,.88);backdrop-filter:blur(20px);padding:14px 18px 10px;border-bottom:1px solid var(--border)}
@@ -78,7 +86,7 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
 .fab:active{transform:scale(.88)}
 
 /* CHARA GRID */
-.chara-grid{flex:1;overflow-y:auto;padding:10px 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+.chara-grid{padding:10px 14px 100px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 .chara-cell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;background:var(--bg2);border-radius:12px;cursor:pointer;text-align:center;transition:background .15s}
 .chara-cell:active{background:var(--bg3)}
 .chara-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500;border:2px solid}
@@ -111,7 +119,7 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
 
 .view-wrap{position:relative;border-radius:10px;overflow:hidden;margin-bottom:12px}
 .view-wp{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0;pointer-events:none}
-.view-content{position:relative;z-index:1;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.8;color:var(--text);max-height:55dvh;overflow-y:auto;padding:16px;background:rgba(10,10,18,.75)}
+.view-content{position:relative;z-index:1;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.8;color:var(--text);max-height:75dvh;overflow-y:auto;padding:16px;background:rgba(10,10,18,.45)}
 .view-actions{display:flex;gap:6px;flex-wrap:wrap}
 
 .wp-preview{width:100%;height:120px;border-radius:10px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--bg);color:var(--text3);font-size:13px;position:relative;margin-bottom:8px}
@@ -136,8 +144,14 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
 
 <div class="screen active" id="sLock">
   <h2>Secret Log</h2>
-  <div class="pattern-grid" id="patternGrid">
-    <canvas class="pattern-canvas" id="patternCanvas"></canvas>
+  <div id="lockPatternArea">
+    <div class="pattern-grid" id="patternGrid">
+      <canvas class="pattern-canvas" id="patternCanvas"></canvas>
+    </div>
+  </div>
+  <div id="lockPinArea" style="display:none">
+    <div class="pin-dots" id="pinDots"><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div></div>
+    <div class="numpad" id="numpad"></div>
   </div>
   <div class="lock-sub" id="lockMsg">パターンを描いてね</div>
 </div>
@@ -163,7 +177,7 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
     <div class="filter-chips" id="filterChips"></div>
     <div class="log-list" id="logList"></div>
   </div>
-  <div id="tabChara" style="display:none;flex:1;overflow:hidden">
+  <div id="tabChara" style="display:none;flex:1;overflow-y:auto">
     <div class="chara-grid" id="charaGrid"></div>
   </div>
   <button class="fab" onclick="openAdd()">＋</button>
@@ -181,7 +195,7 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
         </div>
       </div>
     </div>
-    <div class="log-list" id="charaLogList" style="background:rgba(10,10,18,.6)"></div>
+    <div class="log-list" id="charaLogList" style="background:rgba(10,10,18,.35)"></div>
   </div>
 </div>
 
@@ -229,6 +243,13 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
       <button class="btn btn-primary" style="width:100%;padding:10px" onclick="startPatternChange()">新しいパターンを設定</button>
     </div>
     <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;margin-bottom:8px">PIN変更</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="password" id="newPin" maxlength="4" placeholder="新しい4桁PIN" style="flex:1;padding:10px;text-align:center;font-size:18px;letter-spacing:8px">
+        <button class="btn btn-primary btn-sm" onclick="changePin()">変更</button>
+      </div>
+    </div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="font-size:14px;margin-bottom:8px">キャラ色カスタマイズ</div>
       <div id="charaColorList"></div>
     </div>
@@ -252,7 +273,7 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
     <input type="file" id="cwpInput" accept="image/*" style="display:none" onchange="onCwpImage(event)">
     <div class="slider-row">
       <label>透明度</label>
-      <input type="range" id="cwpOpacity" min="5" max="80" value="25" oninput="document.getElementById('cwpOVal').textContent=this.value">
+      <input type="range" id="cwpOpacity" min="5" max="100" value="40" oninput="document.getElementById('cwpOVal').textContent=this.value">
       <span class="val" id="cwpOVal">25</span>
     </div>
     <div class="form-actions">
@@ -369,9 +390,35 @@ function showErr(){
 }
 function waitP(){return new Promise(r=>{PS.resolve=r})}
 
+const getPin=()=>S('pin');
+const setPin=p=>SS('pin',p);
+
+// PIN UI
+function initNumpad(){
+  const pad=document.getElementById('numpad');
+  pad.innerHTML='';
+  for(let i=1;i<=9;i++){const b=document.createElement('button');b.textContent=i;b.onclick=()=>pinInput(String(i));pad.appendChild(b)}
+  const sp=document.createElement('button');sp.disabled=true;sp.style.visibility='hidden';pad.appendChild(sp);
+  const z=document.createElement('button');z.textContent='0';z.onclick=()=>pinInput('0');pad.appendChild(z);
+  const del=document.createElement('button');del.className='del-btn';del.textContent='DEL';del.onclick=pinDel;pad.appendChild(del);
+}
+let pinBuf='',pinResolve=null;
+function pinInput(n){
+  if(pinBuf.length>=4)return;pinBuf+=n;updPinDots();
+  if(pinBuf.length===4)setTimeout(()=>{if(pinResolve)pinResolve(pinBuf)},150);
+}
+function pinDel(){pinBuf=pinBuf.slice(0,-1);updPinDots()}
+function updPinDots(){document.querySelectorAll('#pinDots .pin-dot').forEach((d,i)=>{d.classList.remove('error');d.classList.toggle('filled',i<pinBuf.length)})}
+function showPinErr(){document.querySelectorAll('#pinDots .pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error')});setTimeout(()=>{pinBuf='';updPinDots()},500)}
+function waitPin(){return new Promise(r=>{pinResolve=r;pinBuf='';updPinDots()})}
+function showPinUI(){document.getElementById('lockPatternArea').style.display='none';document.getElementById('lockPinArea').style.display='';initNumpad()}
+function showPatternUI(){document.getElementById('lockPatternArea').style.display='';document.getElementById('lockPinArea').style.display='none'}
+
 async function lockFlow(){
-  const saved=getPattern(),msg=document.getElementById('lockMsg');
-  if(!saved){
+  const savedP=getPattern(),savedPin=getPin(),msg=document.getElementById('lockMsg');
+  showPatternUI();
+  if(!savedP){
+    // First time: set pattern
     msg.textContent='新しいパターンを描いてね（3点以上）';
     initPG(document.getElementById('patternGrid'),document.getElementById('patternCanvas'),'lock');
     const p1=await waitP();
@@ -379,14 +426,41 @@ async function lockFlow(){
     setTimeout(()=>{clrD();drawL()},400);
     await new Promise(r=>setTimeout(r,500));PS.sel=[];
     const p2=await waitP();
-    if(p1===p2){setPattern(p1);toast('パターンを設定しました');unlock()}
-    else{showErr();msg.textContent='一致しなかった。もう一度';setTimeout(()=>lockFlow(),800)}
+    if(p1===p2){
+      setPattern(p1);toast('パターンを設定しました');
+      // Now set PIN
+      showPinUI();
+      msg.textContent='4桁のPINを設定してね';
+      const pin1=await waitPin();
+      msg.textContent='もう一度同じPINを入力してね';
+      const pin2=await waitPin();
+      if(pin1===pin2){setPin(pin1);toast('PINを設定しました');unlock()}
+      else{showPinErr();msg.textContent='一致しなかった。もう一度';setTimeout(()=>lockFlow(),800)}
+    } else {showErr();msg.textContent='一致しなかった。もう一度';setTimeout(()=>lockFlow(),800)}
   } else {
+    // Verify pattern
     msg.textContent='パターンを描いてね';
     initPG(document.getElementById('patternGrid'),document.getElementById('patternCanvas'),'lock');
     const p=await waitP();
-    if(p===saved) unlock();
-    else{showErr();msg.textContent='パターンが違うよ';setTimeout(()=>lockFlow(),800)}
+    if(p===savedP){
+      if(savedPin){
+        // Stage 2: PIN
+        showPinUI();
+        msg.textContent='PINを入力してね';
+        const pin=await waitPin();
+        if(pin===savedPin){unlock()}
+        else{showPinErr();msg.textContent='PINが違うよ';setTimeout(()=>{showPatternUI();lockFlow()},800)}
+      } else {
+        // No PIN set yet, set one
+        showPinUI();
+        msg.textContent='4桁のPINを設定してね';
+        const pin1=await waitPin();
+        msg.textContent='もう一度同じPINを入力してね';
+        const pin2=await waitPin();
+        if(pin1===pin2){setPin(pin1);toast('PINを設定しました');unlock()}
+        else{showPinErr();msg.textContent='一致しなかった';setTimeout(()=>lockFlow(),800)}
+      }
+    } else {showErr();msg.textContent='パターンが違うよ';setTimeout(()=>lockFlow(),800)}
   }
 }
 function unlock(){goScreen('sMain');renderAll()}
@@ -456,7 +530,7 @@ function openCL(id){
 }
 function applyWp(id){
   const wp=getCharaWp(id),l=document.getElementById('charaWpLayer');
-  if(wp.img){l.style.backgroundImage=`url(${wp.img})`;l.style.opacity=(wp.opacity||25)/100}
+  if(wp.img){l.style.backgroundImage=`url(${wp.img})`;l.style.opacity=(wp.opacity||40)/100}
   else{l.style.backgroundImage='';l.style.opacity=0}
 }
 function renderCLL(id){
@@ -517,7 +591,7 @@ function viewLog(id){
   document.getElementById('viewContent').textContent=l.content;
   const wp=document.getElementById('viewWp'),vc=document.getElementById('viewContent');
   let hasWp=false;
-  if(l.charas&&l.charas.length){const w=getCharaWp(l.charas[0]);if(w.img){wp.style.backgroundImage=`url(${w.img})`;wp.style.opacity=(w.opacity||25)/100;vc.style.background='rgba(10,10,18,.7)';hasWp=true}}
+  if(l.charas&&l.charas.length){const w=getCharaWp(l.charas[0]);if(w.img){wp.style.backgroundImage=`url(${w.img})`;wp.style.opacity=(w.opacity||40)/100;vc.style.background='rgba(10,10,18,.45)';hasWp=true}}
   if(!hasWp){wp.style.backgroundImage='';wp.style.opacity=0;vc.style.background='var(--bg)'}
   openModal('viewModal');
 }
@@ -537,8 +611,8 @@ function openCharaWpSetting(){
   if(wp.img)pv.innerHTML=`<img src="${wp.img}"><button class="wp-clear" onclick="event.stopPropagation();clrPv()">×</button>`;
   else pv.innerHTML='タップして画像を選択';
   pv.dataset.val=wp.img||'';
-  document.getElementById('cwpOpacity').value=wp.opacity||25;
-  document.getElementById('cwpOVal').textContent=wp.opacity||25;
+  document.getElementById('cwpOpacity').value=wp.opacity||40;
+  document.getElementById('cwpOVal').textContent=wp.opacity||40;
   openModal('charaWpModal');
 }
 function onCwpImage(e){const f=e.target.files[0];e.target.value='';if(!f)return;cmpImg(f,800,.6).then(d=>{const pv=document.getElementById('cwpPreview');pv.innerHTML=`<img src="${d}"><button class="wp-clear" onclick="event.stopPropagation();clrPv()">×</button>`;pv.dataset.val=d})}
@@ -548,6 +622,7 @@ function clearCharaWp(){setCharaWp(wpTarget,{});clrPv();applyWp(wpTarget);closeM
 function cmpImg(f,mw,q){return new Promise(r=>{const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');let w=im.width,h=im.height;if(w>mw){h=h*(mw/w);w=mw}c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);r(c.toDataURL('image/jpeg',q))};im.src=rd.result};rd.readAsDataURL(f)})}
 
 function openSettings(){renderCCL();openModal('settingsModal')}
+function changePin(){const v=document.getElementById('newPin').value;if(!/^\d{4}$/.test(v)){toast('4桁の数字を入力してね');return}setPin(v);document.getElementById('newPin').value='';toast('PINを変更しました')}
 function renderCCL(){
   document.getElementById('charaColorList').innerHTML=CHARAS.map(c=>{
     const col=charaColor(c.id);
@@ -571,7 +646,7 @@ async function startPatternChange(){
 }
 
 function exportData(){
-  const data={logs:getLogs(),cc:getCharaColors(),pattern:getPattern()};
+  const data={logs:getLogs(),cc:getCharaColors(),pattern:getPattern(),pin:getPin()};
   CHARAS.forEach(c=>{const w=getCharaWp(c.id);if(w.img)data['wp_'+c.id]=w});
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='secret-log-backup.json';a.click();toast('エクスポートしました');
@@ -580,7 +655,7 @@ function importData(){document.getElementById('importFile').click()}
 function handleImport(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.logs)setLogs(d.logs);if(d.cc)setCharaColors(d.cc);if(d.pattern)setPattern(d.pattern);CHARAS.forEach(c=>{if(d['wp_'+c.id])setCharaWp(c.id,d['wp_'+c.id])});renderAll();toast('インポートしました')}catch{toast('読み込めませんでした')}};
+  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.logs)setLogs(d.logs);if(d.cc)setCharaColors(d.cc);if(d.pattern)setPattern(d.pattern);if(d.pin)setPin(d.pin);CHARAS.forEach(c=>{if(d['wp_'+c.id])setCharaWp(c.id,d['wp_'+c.id])});renderAll();toast('インポートしました')}catch{toast('読み込めませんでした')}};
   r.readAsText(f);e.target.value='';
 }
 
