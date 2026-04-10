@@ -170,14 +170,14 @@ body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var
     </div>
   </div>
   <div class="nav-tabs">
-    <div class="nav-tab active" data-t="list" onclick="switchMainTab('list')">📝 ログ一覧</div>
-    <div class="nav-tab" data-t="chara" onclick="switchMainTab('chara')">👤 キャラ別</div>
+    <div class="nav-tab" data-t="list" onclick="switchMainTab('list')">📝 ログ一覧</div>
+    <div class="nav-tab active" data-t="chara" onclick="switchMainTab('chara')">👤 キャラ別</div>
   </div>
-  <div id="tabList" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+  <div id="tabList" style="display:none;flex-direction:column;flex:1;overflow:hidden">
     <div class="filter-chips" id="filterChips"></div>
     <div class="log-list" id="logList"></div>
   </div>
-  <div id="tabChara" style="display:none;flex:1;overflow-y:auto">
+  <div id="tabChara" style="flex:1;overflow-y:auto">
     <div class="chara-grid" id="charaGrid"></div>
   </div>
   <button class="fab" onclick="openAdd()">＋</button>
@@ -463,11 +463,11 @@ async function lockFlow(){
     } else {showErr();msg.textContent='パターンが違うよ';setTimeout(()=>lockFlow(),800)}
   }
 }
-function unlock(){goScreen('sMain');renderAll()}
+function unlock(){goScreen('sMain');switchMainTab('chara');renderAll()}
 
 function goScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
-let mainTab='list';
+let mainTab='chara';
 function switchMainTab(t){
   mainTab=t;
   document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
@@ -626,10 +626,21 @@ function changePin(){const v=document.getElementById('newPin').value;if(!/^\d{4}
 function renderCCL(){
   document.getElementById('charaColorList').innerHTML=CHARAS.map(c=>{
     const col=charaColor(c.id);
-    return `<div class="color-row"><label>${c.name}</label><div class="chara-avatar" style="width:28px;height:28px;font-size:11px;border-color:${col};color:${col};border-width:1.5px">${c.kanji}</div><input type="color" value="${col}" onchange="updCC('${c.id}',this.value)"></div>`;
+    const presets=['#8ec8e8','#7b9fd4','#7ecba1','#c9a84c','#a29bfe','#9e9e9e','#d4849a','#7ecc5a','#cba87e','#f8a5c2','#ff6b6b','#feca57','#74b9ff','#a3cb38','#e17055','#dfe6e9','#fd79a8','#00cec9'];
+    return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div class="chara-avatar" style="width:28px;height:28px;font-size:11px;border-color:${col};color:${col};border-width:1.5px">${c.kanji}</div>
+        <span style="font-size:13px;flex:1">${c.name}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:monospace">${col}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${presets.map(p=>`<div onclick="updCC('${c.id}','${p}')" style="width:28px;height:28px;border-radius:50%;background:${p};cursor:pointer;border:2px solid ${p===col?'#fff':'transparent'};flex-shrink:0"></div>`).join('')}
+        <input type="text" value="${col}" onchange="if(/^#[0-9a-fA-F]{6}$/.test(this.value))updCC('${c.id}',this.value)" placeholder="#hex" style="width:80px;padding:4px 8px;font-size:11px;font-family:monospace;border-radius:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);outline:none">
+      </div>
+    </div>`;
   }).join('');
 }
-function updCC(id,col){const c=getCharaColors();c[id]=col;setCharaColors(c);renderCCL();toast('色を変更しました')}
+function updCC(id,col){const c=getCharaColors();c[id]=col;setCharaColors(c);renderCCL();renderAll();toast(CHARAS.find(x=>x.id===id).name+'の色を変更')}
 
 async function startPatternChange(){
   closeModal('settingsModal');openModal('patternChangeModal');
